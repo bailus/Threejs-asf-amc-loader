@@ -156,25 +156,38 @@ THREE.ASFLoader.prototype = {
 		};
 
 		var bones = [];
-		var makeBone = function (name, position) {
-			var bone = new THREE.Bone();
-			if (name === 'rhipjoint') bone.visible = false;
-
-			bone.name = name;
-			bone.position.x = position.x;
-			bone.position.y = position.y;
-			bone.position.z = position.z;
+		var makeBone = function (name, position, parentRotation) {
+			parentRotation = parentRotation || new THREE.Quaternion;
+			position = position || new THREE.Vector3;
 
 			var data = skeleton.bonedata.findByName(name);
-			bone.dof = data.dof;
-			bone.axis = data.axis;
+			if (!data) return;
 
-			var endOfBone = stringToVec3(data.direction).setLength(data.length);
-			var childNames = skeleton.hierarchy.findByName(name);
+			var direction = stringToVec3(data.direction).normalize();
 
-			if (childNames) childNames.split(' ').forEach(function (childName) {
-				bone.add(makeBone(childName, endOfBone));
-			});
+			var rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+
+			var bone = new THREE.Bone();
+			bone.name = name;
+			bone.position.copy(position);
+			
+			bone.quaternion.multiply(parentRotation.clone().inverse()); //back to world space rotation
+			bone.quaternion.multiply(rotation); //to bone space (bone is along the positive z-axis)
+
+			//amcLoader uses these:
+			bone.userData.rotation = rotation.clone();
+			bone.userData.parentRotation = parentRotation.clone();
+			bone.userData.dof = data.dof;
+			bone.userData.axis = data.axis;
+
+
+			var endOfBone = new THREE.Vector3(0, 0, data.length);
+
+			(skeleton.hierarchy.findByName(name) || '').split(' ').
+				forEach(function (childName) {
+					var childBone = makeBone(childName, endOfBone, rotation.clone());
+					if (childBone) bone.add(childBone);
+				});
 
 			bones.push(bone);
 			return bone;
@@ -185,12 +198,12 @@ THREE.ASFLoader.prototype = {
 			var bone = new THREE.Bone();
 			bones.push(bone);
 
-			var rootPosition = stringToVec3(skeleton.root.position);
+			bone.position.copy(stringToVec3(skeleton.root.position));
 
 			var childNames = skeleton.hierarchy.findByName("root");
 
 			if (childNames) childNames.split(' ').forEach(function (childName) {
-				bone.add(makeBone(childName, rootPosition));
+				bone.add(makeBone(childName, new THREE.Vector3(), new THREE.Quaternion()));
 			});
 			return bone;
 		};

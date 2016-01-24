@@ -43,15 +43,15 @@ var asfLoader = new THREE.ASFLoader();
 asfLoader.load('priman.asf', function (bones) {
 	mesh = createMesh(bones);
 	scene.add(mesh);
-	renderer.render(scene, camera);
+	//renderer.render(scene, camera);
 
 	mixer = new THREE.AnimationMixer(mesh);
 
-	/*var amcLoader = new THREE.AMCLoader(bones, 'priman.amc');
+	var amcLoader = new THREE.AMCLoader(bones, 'priman.amc');
 	amcLoader.load('priman.amc', function (animation) {
 		console.log(animation);
 		mixer.addAction(new THREE.AnimationAction(animation));
-	});*/
+	});
 });
 
 var stats = new Stats();

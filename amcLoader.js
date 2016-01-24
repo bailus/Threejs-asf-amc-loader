@@ -106,8 +106,8 @@ THREE.AMCLoader.prototype = {
 		};
 
 		var getAxis = function (bone) { /* returns THREE.Quaternion */
-			if (!bone.axis) return new THREE.Quaternion();
-			var axis = bone.axis.trim().split(' ');
+			if (!bone.userData.axis) return new THREE.Quaternion();
+			var axis = bone.userData.axis.trim().split(' ');
 			var order = axis.pop();
 			var euler = new THREE.Euler(angleToRadians(axis[0]), angleToRadians(axis[1]), angleToRadians(axis[2]), order);
 			var quaternion = new THREE.Quaternion();
@@ -118,8 +118,9 @@ THREE.AMCLoader.prototype = {
 		var getRotation = function (bone, frameData) { /* returns THREE.Quaternion */
 			var x, y, z;
 			var order = '';
-			if (!bone.dof) return new THREE.Quaternion();
-			var dof = bone.dof.trim().split(' ');
+			var quaternion = new THREE.Quaternion();
+			if (!bone.userData.dof) return quaternion;
+			var dof = bone.userData.dof.trim().split(' ');
 			for (var i = 0; i < dof.length; i++) {
 				if (dof[i] == 'rx') { x = frameData[i]; order += 'X'; }
 				if (dof[i] == 'ry') { y = frameData[i]; order += 'Y'; }
@@ -129,7 +130,6 @@ THREE.AMCLoader.prototype = {
 			if (y === undefined) { y = 0; order += 'Y'; }
 			if (z === undefined) { z = 0; order += 'Z'; }
 			var euler = new THREE.Euler(angleToRadians(x), angleToRadians(y), angleToRadians(z), order);
-			var quaternion = new THREE.Quaternion();
 			quaternion.setFromEuler(euler);
 			return quaternion;
 		};
@@ -171,7 +171,7 @@ THREE.AMCLoader.prototype = {
 		for (var j = 0; j < this.bones.length; j++) {
 			var bone = this.bones[j];
 
-			if (!bone || !bone.axis) continue;
+			if (!bone || !bone.userData || !bone.userData.axis) continue;
 
 			var keys = {
 				translation: [],
@@ -191,14 +191,19 @@ THREE.AMCLoader.prototype = {
 					quaternion = new THREE.Quaternion(),
 					scale = new THREE.Vector3();
 					
-				getTransform(bone.dof, frame[bone.name]).decompose(translation, quaternion, scale);
+				getTransform(bone.userData.dof, frame[bone.name]).decompose(translation, quaternion, scale);
+
+				var animationQuaternion = new THREE.Quaternion().
+					multiply(axis).
+					multiply(quaternion).
+					multiply(inverseAxis);
 
 				keys.quaternion.push({
 					time: t,
 					value: new THREE.Quaternion().
-								multiply(inverseAxis).
-								multiply(quaternion).
-								multiply(axis)
+									multiply(bone.userData.parentRotation.clone().inverse()). //back to world space rotation
+									multiply(animationQuaternion).
+									multiply(bone.userData.rotation) //to bone space (bone is along the positive z-axis)
 				});
 
 				keys.translation.push({
